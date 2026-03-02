@@ -3,8 +3,47 @@
  */
 package compiler;
 
+import compiler.Lexer.Lexer;
+import compiler.Lexer.Symbol;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 public class Compiler {
+
+    private static final String DEFAULT_INPUT = "code_example.txt";
+
     public static void main(String[] args) {
+        if (args.length >= 1 && "-lexer".equals(args[0])) {
+            String file = (args.length >= 2) ? args[1] : DEFAULT_INPUT;
+            runLexer(file);
+            return;
+        }
+
         System.out.println("Hello from the compiler !");
+        System.out.println("Usage:");
+        System.out.println("  gradle run --args=\"-lexer\"                 # uses code_example.txt");
+        System.out.println("  gradle run --args=\"-lexer <input_file>\"    # uses provided file");
+    }
+
+    private static void runLexer(String filePath) {
+        Path p = Path.of(filePath).toAbsolutePath().normalize();
+        try (BufferedReader br = Files.newBufferedReader(p)) {
+            Lexer lexer = new Lexer(br);
+
+            while (true) {
+                Symbol s = lexer.getNextSymbol();
+                System.out.println(s);
+                if (s.getKind() == Symbol.Kind.EOF) break;
+            }
+        } catch (RuntimeException e) {
+            System.err.println(e.getMessage());
+            System.exit(2);
+        } catch (IOException e) {
+            System.err.println("Cannot read file: " + p + " (" + e.getMessage() + ")");
+            System.exit(2);
+        }
     }
 }
