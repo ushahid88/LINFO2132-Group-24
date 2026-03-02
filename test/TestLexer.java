@@ -3,6 +3,8 @@ import org.junit.Test;
 
 import java.io.StringReader;
 import compiler.Lexer.Lexer;
+import compiler.Lexer.Symbol;
+import static org.junit.Assert.assertEquals;
 
 public class TestLexer {
     
@@ -12,6 +14,42 @@ public class TestLexer {
         StringReader reader = new StringReader(input);
         Lexer lexer = new Lexer(reader);
         assertNotNull(lexer.getNextSymbol());
+    }
+
+    @Test
+    public void lexesBasicProgramPieces() {
+        String input =
+                "def main() {\n" +
+                        "  # comment\n" +
+                        "  final x = 00342;\n" +
+                        "  y = .234;\n" +
+                        "  println(\"hi\\n\\\\\\\"\");\n" +
+                        "}\n";
+
+        Lexer lexer = new Lexer(new StringReader(input));
+
+        assertEquals(new Symbol(Symbol.Kind.KW_DEF), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.IDENTIFIER, "main"), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.LPAREN), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.RPAREN), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.LBRACE), lexer.getNextSymbol());
+
+        assertEquals(new Symbol(Symbol.Kind.KW_FINAL), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.IDENTIFIER, "x"), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.ASSIGN), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.INT_LITERAL, "342"), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.SEMICOLON), lexer.getNextSymbol());
+
+        assertEquals(new Symbol(Symbol.Kind.IDENTIFIER, "y"), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.ASSIGN), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.FLOAT_LITERAL, "0.234"), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.SEMICOLON), lexer.getNextSymbol());
+    }
+
+    @Test(expected = Lexer.LexerException.class)
+    public void throwsOnUnknownToken() {
+        Lexer lexer = new Lexer(new StringReader("@"));
+        lexer.getNextSymbol();
     }
 
 }
