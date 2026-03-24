@@ -7,111 +7,110 @@ import static compiler.Lexer.Symbol.Kind.*;
 
 public class Parser {
 
-    private final Lexer lexer;
-    private Symbol lookahead;
+    private final TokenCursor t;
 
     public Parser(Lexer lexer) {
-        this.lexer = lexer;
-        this.lookahead = lexer.getNextSymbol();
+        this.t = new TokenCursor(lexer);
+    }
+    public Object parse() {
+        return parseProgram();
     }
 
     public AstNode getAST() {
         AstNode root = parseProgram();
-        expect(EOF);
+        t.consume(EOF);
         return root;
     }
 
-    // ---------------- Program / Decls ----------------
-
     private AstNode parseProgram() {
         Node program = new Node("Program");
-        while (lookahead.getKind() != EOF) {
+        while (t.kind() != EOF) {
             program.children().add(parseTopLevelDecl());
         }
         return program;
     }
 
     private AstNode parseTopLevelDecl() {
-        if (lookahead.getKind() == KW_FINAL) {
-            return parseConstDecl();
-        }
-        if (lookahead.getKind() == KW_DEF) {
-            return parseFunctionDecl();
-        }
-        if (startsType(lookahead.getKind())) {
-            return parseVarDecl();
-        }
-        throw error("Expected top-level declaration (final/def/type), got " + lookahead);
+        if (t.kind() == KW_FINAL) return parseConstDecl();
+        if (t.kind() == KW_COLL)  return parseCollDecl();
+        if (t.kind() == KW_DEF)   return parseFunctionDecl();
+        if (startsType(t.kind())) return parseVarDecl();
+        throw err("Expected top-level declaration (final/coll/def/type), got " + t.peek());
     }
 
     private AstNode parseConstDecl() {
-        consume(KW_FINAL);
+        t.consume(KW_FINAL);
         AstNode type = parseType();
         AstNode id = parseIdentifier();
-        consume(ASSIGN);
+        t.consume(ASSIGN);
         AstNode expr = parseExpr();
-        consume(SEMICOLON);
+        t.consume(SEMICOLON);
 
-        return new Node("ConstDecl",
-                type,
-                id,
-                Node.leaf("AssignmentOperator"),
-                expr
-        );
+        return new Node("ConstDecl", type, id, Node.leaf("AssignmentOperator"), expr);
     }
 
     private AstNode parseVarDecl() {
         AstNode type = parseType();
         AstNode id = parseIdentifier();
 
-        if (lookahead.getKind() == ASSIGN) {
-            consume(ASSIGN);
+        if (t.kind() == ASSIGN) {
+            t.consume(ASSIGN);
             AstNode expr = parseExpr();
-            consume(SEMICOLON);
-            return new Node("VarDecl",
-                    type,
-                    id,
-                    Node.leaf("AssignmentOperator"),
-                    expr
-            );
+            t.consume(SEMICOLON);
+            return new Node("VarDecl", type, id, Node.leaf("AssignmentOperator"), expr);
         }
 
-        consume(SEMICOLON);
+        t.consume(SEMICOLON);
         return new Node("VarDecl", type, id);
     }
 
-    private AstNode parseFunctionDecl() {
-        consume(KW_DEF);
+    private AstNode parseCollDecl() {
+        t.consume(KW_COLL);
 
-        // return type is optional: def main() { ... }
-        AstNode returnType;
-        if (startsType(lookahead.getKind())) {
-            returnType = parseType();
-        } else {
-            returnType = Node.leaf("Type, VOID");
+        if (t.kind() != COLLECTION_NAME) {
+            throw err("Expected collection name after 'coll', got " + t.peek());
         }
+        String name = t.peek().getLexeme();
+        t.consume(COLLECTION_NAME);
+
+        t.consume(LBRACE);
+        Node fields = new Node("Fields");
+        while (t.kind() != RBRACE) {
+            fields.children().add(parseFieldDecl());
+        }
+        t.consume(RBRACE);
+
+        return new Node("CollDecl", Node.leaf("CollectionName, " + name), fields);
+    }
+
+    private AstNode parseFieldDecl() {
+        AstNode type = parseType();
+        AstNode id = parseIdentifier();
+        t.consume(SEMICOLON);
+        return new Node("FieldDecl", type, id);
+    }
+
+    private AstNode parseFunctionDecl() {
+        t.consume(KW_DEF);
+        AstNode returnType = startsType(t.kind()) ? parseType() : Node.leaf("Type, VOID");
 
         AstNode name = parseIdentifier();
 
-        consume(LPAREN);
+        t.consume(LPAREN);
         AstNode params = parseParams();
-        consume(RPAREN);
+        t.consume(RPAREN);
 
         AstNode body = parseBlock();
-
         return new Node("FunctionDecl", returnType, name, params, body);
     }
 
     private AstNode parseParams() {
         Node params = new Node("Params");
-
-        if (lookahead.getKind() == RPAREN) {
-            return params; // empty
-        }
+        if (t.kind() == RPAREN) return params;
 
         params.children().add(parseParam());
-        while (lookahead.getKind() == COMMA) {
-            consume(COMMA);
+        while (t.kind() == COMMA) {
+            t.consume(COMMA);
             params.children().add(parseParam());
         }
         return params;
@@ -123,83 +122,134 @@ public class Parser {
         return new Node("Param", type, id);
     }
 
-    private AstNode parseBlock() {
-        consume(LBRACE);
-        Node block = new Node("Block");
-        while (lookahead.getKind() != RBRACE) {
-            block.children().add(parseStatement());
-        }
-        consume(RBRACE);
-        return block;
-    }
-
-    // ---------------- Types ----------------
-
     private AstNode parseType() {
         String base;
-        switch (lookahead.getKind()) {
-            case TYPE_INT: base = "INT"; consume(TYPE_INT); break;
-            case TYPE_FLOAT: base = "FLOAT"; consume(TYPE_FLOAT); break;
-            case TYPE_BOOL: base = "BOOL"; consume(TYPE_BOOL); break;
-            case TYPE_STRING: base = "STRING"; consume(TYPE_STRING); break;
+        switch (t.kind()) {
+            case TYPE_INT:    base = "INT";    t.consume(TYPE_INT); break;
+            case TYPE_FLOAT:  base = "FLOAT";  t.consume(TYPE_FLOAT); break;
+            case TYPE_BOOL:   base = "BOOL";   t.consume(TYPE_BOOL); break;
+            case TYPE_STRING: base = "STRING"; t.consume(TYPE_STRING); break;
             case COLLECTION_NAME:
-                base = lookahead.getLexeme();
-                consume(COLLECTION_NAME);
+                base = t.peek().getLexeme();
+                t.consume(COLLECTION_NAME);
                 break;
             default:
-                throw error("Expected a type, got " + lookahead);
+                throw err("Expected a type, got " + t.peek());
         }
 
         int dims = 0;
-        while (lookahead.getKind() == LBRACKET) {
-            consume(LBRACKET);
-            consume(RBRACKET);
+        while (t.kind() == LBRACKET) {
+            t.consume(LBRACKET);
+            t.consume(RBRACKET);
             dims++;
         }
 
-        StringBuilder t = new StringBuilder(base);
-        for (int i = 0; i < dims; i++) t.append("[]");
-        return Node.leaf("Type, " + t);
+        StringBuilder sb = new StringBuilder(base);
+        for (int i = 0; i < dims; i++) sb.append("[]");
+        return Node.leaf("Type, " + sb);
     }
 
     private static boolean startsType(Symbol.Kind k) {
         return k == TYPE_INT || k == TYPE_FLOAT || k == TYPE_BOOL || k == TYPE_STRING || k == COLLECTION_NAME;
     }
 
-    // ---------------- Statements ----------------
+    private AstNode parseIdentifier() {
+        if (t.kind() != IDENTIFIER) {
+            throw err("Expected identifier, got " + t.peek());
+        }
+        String name = t.peek().getLexeme();
+        t.consume(IDENTIFIER);
+        return Node.leaf("Identifier, " + name);
+    }
+
+    private AstNode parseBlock() {
+        t.consume(LBRACE);
+        Node block = new Node("Block");
+        while (t.kind() != RBRACE) {
+            block.children().add(parseStatement());
+        }
+        t.consume(RBRACE);
+        return block;
+    }
 
     private AstNode parseStatement() {
-        // local var decl
-        if (startsType(lookahead.getKind())) {
-            return parseVarDecl();
-        }
+        if (t.kind() == LBRACE) return parseBlock();
+        if (t.kind() == KW_IF) return parseIf();
+        if (t.kind() == KW_WHILE) return parseWhile();
+        if (t.kind() == KW_FOR) return parseFor();
 
-        // return [expr] ;
-        if (lookahead.getKind() == KW_RETURN) {
-            consume(KW_RETURN);
+        if (startsType(t.kind())) return parseVarDecl();
+
+        if (t.kind() == KW_RETURN) {
+            t.consume(KW_RETURN);
             Node ret = new Node("Return");
-            if (lookahead.getKind() != SEMICOLON) {
+            if (t.kind() != SEMICOLON) {
                 ret.children().add(parseExpr());
             }
-            consume(SEMICOLON);
+            t.consume(SEMICOLON);
             return ret;
         }
 
         // assignment or expression statement
         AstNode left = parseExpr();
-
-        if (lookahead.getKind() == ASSIGN) {
-            consume(ASSIGN);
+        if (t.kind() == ASSIGN) {
+            t.consume(ASSIGN);
             AstNode right = parseExpr();
-            consume(SEMICOLON);
+            t.consume(SEMICOLON);
             return new Node("AssignStmt", left, Node.leaf("AssignmentOperator"), right);
         }
 
-        consume(SEMICOLON);
+        t.consume(SEMICOLON);
         return new Node("ExprStmt", left);
     }
 
-    // ---------------- Expressions (precedence + associativity) ----------------
+    private AstNode parseIf() {
+        t.consume(KW_IF);
+        t.consume(LPAREN);
+        AstNode cond = parseExpr();
+        t.consume(RPAREN);
+        AstNode thenBlock = parseBlock();
+
+        if (t.kind() == KW_ELSE) {
+            t.consume(KW_ELSE);
+            AstNode elseBlock = parseBlock();
+            return new Node("If", cond, thenBlock, elseBlock);
+        }
+        return new Node("If", cond, thenBlock);
+    }
+
+    private AstNode parseWhile() {
+        t.consume(KW_WHILE);
+        t.consume(LPAREN);
+        AstNode cond = parseExpr();
+        t.consume(RPAREN);
+        AstNode body = parseBlock();
+        return new Node("While", cond, body);
+    }
+    private AstNode parseFor() {
+        t.consume(KW_FOR);
+        t.consume(LPAREN);
+
+        AstNode type = parseType();
+        AstNode var = parseIdentifier();
+        t.consume(SEMICOLON);
+
+        AstNode from = parseExpr();
+        t.consume(ARROW);
+        AstNode to = parseExpr();
+        t.consume(SEMICOLON);
+
+        AstNode step = parseExpr();
+        t.consume(RPAREN);
+
+        AstNode body = parseBlock();
+        return new Node("For",
+                new Node("Init", type, var),
+                new Node("Range", from, to),
+                new Node("Step", step),
+                body
+        );
+    }
 
     private AstNode parseExpr() {
         return new Node("Expr", parseOr());
@@ -207,8 +257,8 @@ public class Parser {
 
     private AstNode parseOr() {
         AstNode left = parseAnd();
-        while (lookahead.getKind() == OR) {
-            consume(OR);
+        while (t.kind() == OR) {
+            t.consume(OR);
             AstNode right = parseAnd();
             left = new Node("Expr", left, Node.leaf("LogicalOperator, ||"), right);
         }
@@ -217,8 +267,8 @@ public class Parser {
 
     private AstNode parseAnd() {
         AstNode left = parseCmp();
-        while (lookahead.getKind() == AND) {
-            consume(AND);
+        while (t.kind() == AND) {
+            t.consume(AND);
             AstNode right = parseCmp();
             left = new Node("Expr", left, Node.leaf("LogicalOperator, &&"), right);
         }
@@ -227,12 +277,9 @@ public class Parser {
 
     private AstNode parseCmp() {
         AstNode left = parseAdd();
-        while (lookahead.getKind() == EQ || lookahead.getKind() == NEQ ||
-                lookahead.getKind() == LT || lookahead.getKind() == LE ||
-                lookahead.getKind() == GT || lookahead.getKind() == GE) {
-
-            Symbol.Kind op = lookahead.getKind();
-            consume(op);
+        while (t.kind() == EQ || t.kind() == NEQ || t.kind() == LT || t.kind() == LE || t.kind() == GT || t.kind() == GE) {
+            Symbol.Kind op = t.kind();
+            t.consume(op);
             AstNode right = parseAdd();
             left = new Node("Expr", left, Node.leaf("ComparisonOperator, " + opLexeme(op)), right);
         }
@@ -241,9 +288,9 @@ public class Parser {
 
     private AstNode parseAdd() {
         AstNode left = parseMul();
-        while (lookahead.getKind() == PLUS || lookahead.getKind() == MINUS) {
-            Symbol.Kind op = lookahead.getKind();
-            consume(op);
+        while (t.kind() == PLUS || t.kind() == MINUS) {
+            Symbol.Kind op = t.kind();
+            t.consume(op);
             AstNode right = parseMul();
             left = new Node("Expr", left, Node.leaf("ArithmeticOperator, " + opLexeme(op)), right);
         }
@@ -252,9 +299,9 @@ public class Parser {
 
     private AstNode parseMul() {
         AstNode left = parseUnary();
-        while (lookahead.getKind() == STAR || lookahead.getKind() == SLASH || lookahead.getKind() == MOD) {
-            Symbol.Kind op = lookahead.getKind();
-            consume(op);
+        while (t.kind() == STAR || t.kind() == SLASH || t.kind() == MOD) {
+            Symbol.Kind op = t.kind();
+            t.consume(op);
             AstNode right = parseUnary();
             left = new Node("Expr", left, Node.leaf("ArithmeticOperator, " + opLexeme(op)), right);
         }
@@ -262,100 +309,117 @@ public class Parser {
     }
 
     private AstNode parseUnary() {
-        if (lookahead.getKind() == KW_NOT) {
-            consume(KW_NOT);
+        if (t.kind() == KW_NOT) {
+            t.consume(KW_NOT);
             return new Node("Expr", Node.leaf("UnaryOperator, not"), parseUnary());
         }
-        if (lookahead.getKind() == MINUS) {
-            consume(MINUS);
+        if (t.kind() == MINUS) {
+            t.consume(MINUS);
             return new Node("Expr", Node.leaf("UnaryOperator, -"), parseUnary());
         }
         return parsePostfix();
     }
 
-    // Postfix chaining: call / index / field access
     private AstNode parsePostfix() {
         AstNode base = parseAtom();
-
         while (true) {
-            if (lookahead.getKind() == LPAREN) {
-                consume(LPAREN);
+            if (t.kind() == LPAREN) {
+                t.consume(LPAREN);
                 Node args = parseArgs();
-                consume(RPAREN);
+                t.consume(RPAREN);
                 base = new Node("Call", base, args);
                 continue;
             }
-
-            if (lookahead.getKind() == LBRACKET) {
-                consume(LBRACKET);
+            if (t.kind() == LBRACKET) {
+                t.consume(LBRACKET);
                 AstNode idx = parseExpr();
-                consume(RBRACKET);
+                t.consume(RBRACKET);
                 base = new Node("Index", base, idx);
                 continue;
             }
-
-            if (lookahead.getKind() == DOT) {
-                consume(DOT);
+            if (t.kind() == DOT) {
+                t.consume(DOT);
                 AstNode field = parseIdentifier();
                 base = new Node("FieldAccess", base, field);
                 continue;
             }
-
             break;
         }
-
         return base;
     }
 
     private Node parseArgs() {
         Node args = new Node("Args");
-        if (lookahead.getKind() == RPAREN) {
-            return args;
-        }
+        if (t.kind() == RPAREN) return args;
+
         args.children().add(parseExpr());
-        while (lookahead.getKind() == COMMA) {
-            consume(COMMA);
+        while (t.kind() == COMMA) {
+            t.consume(COMMA);
             args.children().add(parseExpr());
         }
         return args;
     }
 
-    // Primary atoms (no postfix here)
     private AstNode parseAtom() {
-        switch (lookahead.getKind()) {
+        switch (t.kind()) {
             case INT_LITERAL: {
-                String v = lookahead.getLexeme();
-                consume(INT_LITERAL);
+                String v = t.peek().getLexeme();
+                t.consume(INT_LITERAL);
                 return Node.leaf("Integer, " + v);
             }
             case FLOAT_LITERAL: {
-                String v = lookahead.getLexeme();
-                consume(FLOAT_LITERAL);
+                String v = t.peek().getLexeme();
+                t.consume(FLOAT_LITERAL);
                 return Node.leaf("Float, " + v);
             }
             case STRING_LITERAL: {
-                String v = lookahead.getLexeme();
-                consume(STRING_LITERAL);
+                String v = t.peek().getLexeme();
+                t.consume(STRING_LITERAL);
                 return Node.leaf("String, " + v);
             }
             case BOOL_LITERAL: {
-                String v = lookahead.getLexeme();
-                consume(BOOL_LITERAL);
+                String v = t.peek().getLexeme();
+                t.consume(BOOL_LITERAL);
                 return Node.leaf("Boolean, " + v);
             }
             case IDENTIFIER: {
-                String name = lookahead.getLexeme();
-                consume(IDENTIFIER);
+                String name = t.peek().getLexeme();
+                t.consume(IDENTIFIER);
                 return Node.leaf("Identifier, " + name);
             }
+            case COLLECTION_NAME: {
+                String n = t.peek().getLexeme();
+                t.consume(COLLECTION_NAME);
+                return Node.leaf("CollectionName, " + n);
+            }
+            case TYPE_INT:
+            case TYPE_FLOAT:
+            case TYPE_BOOL:
+            case TYPE_STRING: {
+                String base = (t.kind() == TYPE_INT) ? "INT"
+                        : (t.kind() == TYPE_FLOAT) ? "FLOAT"
+                        : (t.kind() == TYPE_BOOL) ? "BOOL"
+                        : "STRING";
+                t.consume(t.kind());
+
+                if (t.kind() != KW_ARRAY) {
+                    throw err("Expected ARRAY after base type in array constructor, got " + t.peek());
+                }
+                t.consume(KW_ARRAY);
+                t.consume(LBRACKET);
+                AstNode sizeExpr = parseExpr();
+                t.consume(RBRACKET);
+
+                return new Node("ArrayConstructor", Node.leaf("Type, " + base), sizeExpr);
+            }
             case LPAREN: {
-                consume(LPAREN);
+                t.consume(LPAREN);
                 AstNode inside = parseExpr();
-                consume(RPAREN);
+                t.consume(RPAREN);
                 return inside;
             }
             default:
-                throw error("Expected expression, got " + lookahead);
+                throw err("Expected expression, got " + t.peek());
         }
     }
 
@@ -376,33 +440,7 @@ public class Parser {
         }
     }
 
-    // ---------------- Lexer interaction helpers ----------------
-
-    private void consume(Symbol.Kind expected) {
-        expect(expected);
-        lookahead = lexer.getNextSymbol();
-    }
-
-    private void expect(Symbol.Kind expected) {
-        if (lookahead.getKind() != expected) {
-            throw error("Expected " + expected + " but got " + lookahead);
-        }
-    }
-
-    private ParserException error(String msg) {
+    private ParserException err(String msg) {
         return new ParserException("ParseError: " + msg);
-    }
-
-    public static class ParserException extends RuntimeException {
-        public ParserException(String message) { super(message); }
-    }
-
-    private AstNode parseIdentifier() {
-        if (lookahead.getKind() != IDENTIFIER) {
-            throw error("Expected identifier, got " + lookahead);
-        }
-        String name = lookahead.getLexeme();
-        consume(IDENTIFIER);
-        return Node.leaf("Identifier, " + name);
     }
 }

@@ -95,8 +95,7 @@ public class Lexer {
             read();
             int next = peek();
             if (!isDigit(next)) {
-                current = '.';
-                return null;
+                return new Symbol(Kind.DOT);
             }
             String frac = readDigits();
             String lexeme = "0." + frac;

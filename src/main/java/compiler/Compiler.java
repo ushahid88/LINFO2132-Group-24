@@ -6,6 +6,7 @@ package compiler;
 import compiler.Lexer.Lexer;
 import compiler.Lexer.Symbol;
 import compiler.parser.AstNode;
+import compiler.parser.AstPrinter;
 import compiler.parser.Parser;
 
 import java.io.BufferedReader;
@@ -60,7 +61,7 @@ public class Compiler {
             Lexer lexer = new Lexer(br);
             Parser parser = new Parser(lexer);
             AstNode ast = parser.getAST();
-            System.out.print(ast.toTreeString());
+            System.out.print(AstPrinter.toTreeString(ast));
         } catch (RuntimeException e) {
             System.err.println(e.getMessage());
             System.exit(2);
