@@ -37,7 +37,7 @@ public class Lexer {
             return lexOperatorOrPunctuation();
 
         } catch (LexerException e) {
-            throw e; // already descriptive
+            throw e;
         } catch (IOException e) {
             throw new LexerException("Lexer IO error: " + e.getMessage(), e);
         }
@@ -70,7 +70,7 @@ public class Lexer {
             if (ch == -1) {
                 throw new LexerException("Unterminated string literal");
             }
-            if (ch == '"') break; // closing quote
+            if (ch == '"') break;
 
             if (ch == '\\') {
                 int esc = read();
@@ -147,6 +147,10 @@ public class Lexer {
             case "return": return new Symbol(Kind.KW_RETURN);
             case "not":    return new Symbol(Kind.KW_NOT);
             case "ARRAY":  return new Symbol(Kind.KW_ARRAY);
+            case "INT":    return new Symbol(Kind.TYPE_INT);
+            case "FLOAT":  return new Symbol(Kind.TYPE_FLOAT);
+            case "BOOL":   return new Symbol(Kind.TYPE_BOOL);
+            case "STRING": return new Symbol(Kind.TYPE_STRING);
             case "true":
             case "false":
                 return new Symbol(Kind.BOOL_LITERAL, word);
@@ -199,10 +203,17 @@ public class Lexer {
 
         switch (ch) {
             case '+': read(); return new Symbol(Kind.PLUS);
-            case '-': read(); return new Symbol(Kind.MINUS);
+
+            case '-':
+                read();
+                if (peek() == '>') { read(); return new Symbol(Kind.ARROW); } // ->
+                return new Symbol(Kind.MINUS);
+
             case '*': read(); return new Symbol(Kind.STAR);
             case '/': read(); return new Symbol(Kind.SLASH);
             case '%': read(); return new Symbol(Kind.MOD);
+
+            case ':': read(); return new Symbol(Kind.COLON);
 
             case '(': read(); return new Symbol(Kind.LPAREN);
             case ')': read(); return new Symbol(Kind.RPAREN);

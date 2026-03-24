@@ -33,3 +33,7 @@ application {
     // Define the main class for the application.
     mainClass.set("compiler.Compiler")
 }
+
+tasks.withType<JavaCompile> {
+    options.encoding = "UTF-8"
+}

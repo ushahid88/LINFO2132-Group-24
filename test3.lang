@@ -1,0 +1,10 @@
+def INT square(INT v) {
+  return v * v;
+}
+
+def main() {
+  INT value = read_INT();
+  println(square(value));
+  value = (value + 2) * 2;
+  return;
+}
