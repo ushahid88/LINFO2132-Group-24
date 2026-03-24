@@ -230,21 +230,25 @@ public class Parser {
         t.consume(KW_FOR);
         t.consume(LPAREN);
 
-        AstNode type = parseType();
-        AstNode var = parseIdentifier();
+        AstNode init;
+        if (startsType(t.kind())) {
+            AstNode type = parseType();
+            AstNode var = parseIdentifier();
+            init = new Node("InitDecl", type, var);
+        } else {
+            AstNode initExpr = parseExpr();
+            init = new Node("InitExpr", initExpr);
+        }
         t.consume(SEMICOLON);
-
         AstNode from = parseExpr();
         t.consume(ARROW);
         AstNode to = parseExpr();
         t.consume(SEMICOLON);
-
         AstNode step = parseExpr();
         t.consume(RPAREN);
-
         AstNode body = parseBlock();
         return new Node("For",
-                new Node("Init", type, var),
+                init,
                 new Node("Range", from, to),
                 new Node("Step", step),
                 body
