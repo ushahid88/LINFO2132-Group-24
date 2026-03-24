@@ -5,6 +5,9 @@ package compiler;
 
 import compiler.Lexer.Lexer;
 import compiler.Lexer.Symbol;
+import compiler.parser.AstNode;
+import compiler.parser.AstPrinter;
+import compiler.parser.Parser;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -19,6 +22,11 @@ public class Compiler {
         if (args.length >= 1 && "-lexer".equals(args[0])) {
             String file = (args.length >= 2) ? args[1] : DEFAULT_INPUT;
             runLexer(file);
+            return;
+        }
+
+        if (args.length >= 2 && "-parser".equals(args[0])) {
+            runParser(args[1]);
             return;
         }
 
@@ -38,6 +46,22 @@ public class Compiler {
                 System.out.println(s);
                 if (s.getKind() == Symbol.Kind.EOF) break;
             }
+        } catch (RuntimeException e) {
+            System.err.println(e.getMessage());
+            System.exit(2);
+        } catch (IOException e) {
+            System.err.println("Cannot read file: " + p + " (" + e.getMessage() + ")");
+            System.exit(2);
+        }
+    }
+
+    private static void runParser(String filePath) {
+        Path p = Path.of(filePath).toAbsolutePath().normalize();
+        try (BufferedReader br = Files.newBufferedReader(p)) {
+            Lexer lexer = new Lexer(br);
+            Parser parser = new Parser(lexer);
+            AstNode ast = parser.getAST();
+            System.out.print(AstPrinter.toTreeString(ast));
         } catch (RuntimeException e) {
             System.err.println(e.getMessage());
             System.exit(2);

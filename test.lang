@@ -1,0 +1,2 @@
+final INT x = 1 + 2;
+INT y = x * 3;
