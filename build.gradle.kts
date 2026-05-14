@@ -21,8 +21,14 @@ sourceSets.main.get().java.srcDir("src")
 sourceSets.test.get().java.srcDir("test")
 
 dependencies {
+    // Use JUnit test framework.
     testImplementation("junit:junit:4.13.2")
-    implementation("org.ow2.asm:asm:9.6")
+    implementation("junit:junit:4.13.2")
+
+    // This dependency is used by the application.
+implementation("com.google.guava:guava:31.1-jre")
+implementation("org.ow2.asm:asm:9.6")
+implementation("org.ow2.asm:asm-commons:9.6")
 }
 
 application {

@@ -1,0 +1,4 @@
+def main() {
+    INT value = 1;
+    printINT(value);
+}

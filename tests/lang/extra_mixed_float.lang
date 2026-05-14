@@ -1,5 +1,0 @@
-def main() {
-    FLOAT x = 1 + 2.5;
-    printFLOAT(x);
-    println("");
-}

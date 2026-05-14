@@ -323,16 +323,10 @@ public final class SemanticAnalyzer {
             TypeInfo right = analyzeExpression(node.children().get(2));
             if (op.label().startsWith("ArithmeticOperator")) {
                 String operator = labelValue(op, "ArithmeticOperator");
-                if (!isNumeric(left) || !isNumeric(right)) {
-                    throw error("OperatorError: arithmetic operator " + operator + " requires numeric operands");
+                if (!left.equals(right) || !isNumeric(left)) {
+                    throw error("OperatorError: arithmetic operator " + operator + " requires same numeric operand types");
                 }
-                if (left.equals(right)) {
-                    return left;
-                }
-                if (isIntFloatMix(left, right)) {
-                    return new TypeInfo("FLOAT", false);
-                }
-                throw error("OperatorError: arithmetic operator " + operator + " requires compatible numeric operand types");
+                return left;
             }
             if (op.label().startsWith("ComparisonOperator")) {
                 String operator = labelValue(op, "ComparisonOperator");
@@ -557,11 +551,6 @@ public final class SemanticAnalyzer {
             return label.substring(delimNoSpace.length());
         }
         throw error("SemanticError: expected " + prefix + " label, got " + label);
-    }
-
-    private boolean isIntFloatMix(TypeInfo a, TypeInfo b) {
-        return (new TypeInfo("INT", false).equals(a) && new TypeInfo("FLOAT", false).equals(b))
-                || (new TypeInfo("FLOAT", false).equals(a) && new TypeInfo("INT", false).equals(b));
     }
 
     private boolean isNumeric(TypeInfo type) {

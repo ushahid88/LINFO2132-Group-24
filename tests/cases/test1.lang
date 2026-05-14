@@ -1,0 +1,7 @@
+def main() {
+    printINT(1);
+    println("");
+    printFLOAT(1.1);
+    println("");
+    print("hello");
+}

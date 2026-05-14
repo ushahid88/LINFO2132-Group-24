@@ -4,8 +4,6 @@
 *.ipr
 *.iws
 out/
-bin/
-tests/lang/*.class
 
 ### Gradle ###
 .gradle/
