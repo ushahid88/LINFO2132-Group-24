@@ -1,0 +1,9 @@
+coll Point {
+    INT x;
+}
+
+def main() {
+    Point p = Point(9);
+    printINT(p.x);
+    println("");
+}

@@ -1,0 +1,10 @@
+def main() {
+    print(str(42));
+    println("");
+    printINT(length("abc"));
+    println("");
+    printINT(floor(-2.7));
+    println("");
+    printINT(ceil(2.2));
+    println("");
+}

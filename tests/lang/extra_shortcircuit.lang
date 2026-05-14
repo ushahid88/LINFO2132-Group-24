@@ -1,0 +1,14 @@
+INT counter = 0;
+
+def BOOL side() {
+    counter = counter + 1;
+    return true;
+}
+
+def main() {
+    BOOL a = false && side();
+    printINT(counter);
+    BOOL b = true || side();
+    printINT(counter);
+    println("");
+}

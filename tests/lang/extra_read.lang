@@ -1,0 +1,5 @@
+def main() {
+    INT x = read_INT();
+    printINT(x);
+    println("");
+}

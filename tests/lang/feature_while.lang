@@ -1,0 +1,8 @@
+def main() {
+    INT n = 0;
+    while(n < 3) {
+        printINT(n);
+        n = n + 1;
+    }
+    println("");
+}
