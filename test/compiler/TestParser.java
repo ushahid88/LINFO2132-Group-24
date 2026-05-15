@@ -1,3 +1,5 @@
+package compiler;
+
 import compiler.Lexer.Lexer;
 import compiler.parser.AstNode;
 import compiler.parser.Parser;
@@ -7,17 +9,15 @@ import org.junit.Test;
 import java.io.StringReader;
 
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class TestParser {
 
     @Test
     public void parsesSimpleProgram() {
-        String input = "def main() { INT x = 5; }";
-
-        Parser parser = new Parser(new Lexer(new StringReader(input)));
-        AstNode result = parser.getAST();
-
+        AstNode result = CompilerTestHelper.parse("def main() { INT x = 5; }");
         assertNotNull(result);
+        assertTrue(result.label().startsWith("Program"));
     }
 
     @Test
@@ -27,11 +27,7 @@ public class TestParser {
                         "  INT x = 10;\n" +
                         "  y = 20;\n" +
                         "}";
-
-        Parser parser = new Parser(new Lexer(new StringReader(input)));
-        AstNode result = parser.getAST();
-
-        assertNotNull(result);
+        assertNotNull(CompilerTestHelper.parse(input));
     }
 
     @Test
@@ -41,40 +37,34 @@ public class TestParser {
                         "  for (INT i; 1 -> 10; i+1) {\n" +
                         "  }\n" +
                         "}";
-
-        Parser parser = new Parser(new Lexer(new StringReader(input)));
-        AstNode result = parser.getAST();
-
-        assertNotNull(result);
+        assertNotNull(CompilerTestHelper.parse(input));
     }
 
     @Test
-    public void parsesPrintStatement() {
+    public void parsesCollectionAndArrayDecl() {
         String input =
-                "def main() {\n" +
-                        "  println(\"hello\");\n" +
+                "coll Point { INT x; INT y; }\n" +
+                        "def main() {\n" +
+                        "  INT[] arr = INT ARRAY [3];\n" +
+                        "  Point p = Point(1, 2);\n" +
                         "}";
+        assertNotNull(CompilerTestHelper.parse(input));
+    }
 
-        Parser parser = new Parser(new Lexer(new StringReader(input)));
-        AstNode result = parser.getAST();
-
-        assertNotNull(result);
+    @Test
+    public void parsesVoidFunction() {
+        String input = "def greet() { println(\"hi\"); } def main() { greet(); }";
+        assertNotNull(CompilerTestHelper.parse(input));
     }
 
     @Test(expected = ParserException.class)
     public void failsOnMissingSemicolon() {
-        String input = "def main() { INT x = 5 }"; // missing ;
-
-        Parser parser = new Parser(new Lexer(new StringReader(input)));
-        parser.getAST();
+        new Parser(new Lexer(new StringReader("def main() { INT x = 5 }"))).getAST();
     }
 
     @Test(expected = ParserException.class)
     public void failsOnInvalidSyntax() {
-        String input = "def main( { }"; // broken syntax
-
-        Parser parser = new Parser(new Lexer(new StringReader(input)));
-        parser.getAST();
+        new Parser(new Lexer(new StringReader("def main( { }"))).getAST();
     }
 
     @Test
@@ -85,10 +75,6 @@ public class TestParser {
                         "    INT x = 1;\n" +
                         "  }\n" +
                         "}";
-
-        Parser parser = new Parser(new Lexer(new StringReader(input)));
-        AstNode result = parser.getAST();
-
-        assertNotNull(result);
+        assertNotNull(CompilerTestHelper.parse(input));
     }
 }

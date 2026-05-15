@@ -19,19 +19,10 @@ public class CodeGenerator {
     private final String mainClassName;
     private final Path outputDir;
 
-    // Collection definitions: name -> list of (fieldName, fieldDescriptor)
     private final Map<String, List<FieldDef>> collections = new LinkedHashMap<>();
-
-    // Global variable info: name -> (descriptor, isFinal)
     private final Map<String, GlobalVarInfo> globals = new LinkedHashMap<>();
-
-    // The .class files generated so far
     private final Map<String, byte[]> classBytes = new LinkedHashMap<>();
-
-    // For tracking if we already wrote a collection class
     private final Set<String> generatedCollectionClasses = new HashSet<>();
-
-    // Function signatures: funcName -> (returnDescriptor, list of parameter descriptors)
     private final Map<String, FunctionSig> functions = new LinkedHashMap<>();
 
     public CodeGenerator(String mainClassName, Path outputDir) {
@@ -44,7 +35,6 @@ public class CodeGenerator {
             throw new CodeGenException("Expected Program node, got " + program.label());
         }
 
-        // First pass: collect collection definitions and function signatures
         for (AstNode child : program.children()) {
             if ("CollDecl".equals(child.label())) {
                 registerCollection(child);
@@ -53,12 +43,10 @@ public class CodeGenerator {
             }
         }
 
-        // Generate collection class files first
         for (String collName : collections.keySet()) {
             generateCollectionClass(collName);
         }
 
-        // Generate the main class with global variables, constants, and functions
         generateMainClass(program);
     }
 
@@ -259,15 +247,11 @@ public class CodeGenerator {
         // Compile the function body
         compileStatements(bodyNode, mv, localSlots, owner, globalVarNames, this);
 
-        // Add trailing return if the function didn't end with one
         if (isMain || "V".equals(returnDesc)) {
-            // Don't add RETURN if the block already ended with a return statement
             if (!lastStatementIsReturn(bodyNode)) {
                 mv.visitInsn(Opcodes.RETURN);
             }
         }
-        // For non-void functions, the return bytecode must have been
-        // emitted by the return statement.
 
         mv.visitMaxs(0, 0);
         mv.visitEnd();
@@ -279,9 +263,7 @@ public class CodeGenerator {
         if (children.isEmpty()) return false;
         AstNode last = children.get(children.size() - 1);
         if ("Return".equals(last.label())) return true;
-        // If the last statement is a block, check inside it recursively
         if ("Block".equals(last.label())) return lastStatementIsReturn(last);
-        // If the last statement is an if/else where both branches return
         if ("If".equals(last.label())) {
             if (last.children().size() == 3) {
                 return lastStatementIsReturn(last.children().get(1)) 
@@ -334,19 +316,9 @@ public class CodeGenerator {
         }
     }
 
-    /**
-     * Pop a value from the stack if the expression produces a value
-     * (avoids popping when the expression is a void function call or println)
-     */
-    /**
-     * Pop a value from the stack if the expression produces a value.
-     * Void functions like println/print leave nothing on the stack.
-     * The node may be an Expr wrapper around the actual expression.
-     */
     private void popIfNeeded(AstNode node, MethodVisitor mv,
                               Map<String, LocalVarInfo> localSlots, String owner,
                               Set<String> globalVarNames, CodeGenerator gen) {
-        // Unwrap Expr nodes
         if ("Expr".equals(node.label()) && node.children().size() == 1) {
             node = node.children().get(0);
         }
@@ -355,16 +327,14 @@ public class CodeGenerator {
             AstNode base = node.children().get(0);
             if (base.label().startsWith("Identifier")) {
                 String funcName = labelValue(base, "Identifier");
-                // Built-in void functions: println, print, print_INT, print_FLOAT
                 if ("println".equals(funcName) || "print".equals(funcName)
                     || "print_INT".equals(funcName) || "print_FLOAT".equals(funcName)
                     || "printINT".equals(funcName) || "printFLOAT".equals(funcName)) {
-                    return; // void function, no value on stack
+                    return;
                 }
-                // User-defined void functions
                 FunctionSig sig = functions.get(funcName);
                 if (sig != null && "V".equals(sig.returnDesc)) {
-                    return; // void function, no value on stack
+                    return;
                 }
             }
         }
@@ -874,7 +844,7 @@ public class CodeGenerator {
         }
         if ("ceil".equals(funcName)) {
             compileExpression(argsNode.children().get(0), mv, localSlots, owner, globalVarNames, gen);
-            // ceil: (int)Math.ceil(float)
+            mv.visitInsn(Opcodes.F2D);
             mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Math", "ceil", "(D)D", false);
             mv.visitInsn(Opcodes.D2I);
             return;
@@ -900,11 +870,6 @@ public class CodeGenerator {
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, owner, funcName, argDesc.toString(), false);
     }
 
-    /**
-     * println - handles all types correctly.
-     * For strings: push System.out, then string, call println(String)
-     * For ints: push System.out, then int, call println(int)
-     */
     private void compilePrintln(AstNode argsNode, MethodVisitor mv,
                                  Map<String, LocalVarInfo> localSlots, String owner,
                                  Set<String> globalVarNames, CodeGenerator gen) {
@@ -917,8 +882,6 @@ public class CodeGenerator {
         AstNode arg = argsNode.children().get(0);
         String argType = getExpressionType(arg, localSlots, owner, globalVarNames, gen);
 
-        // Stack order for invokevirtual: objectref (bottom) then args (top)
-        // System.out is pushed first, then the argument - correct order already
         mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
         compileExpression(arg, mv, localSlots, owner, globalVarNames, gen);
 
@@ -933,9 +896,6 @@ public class CodeGenerator {
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", printlnDesc, false);
     }
 
-    /**
-     * print - same as println but without newline
-     */
     private void compilePrintMethod(AstNode argsNode, MethodVisitor mv,
                                      Map<String, LocalVarInfo> localSlots, String owner,
                                      Set<String> globalVarNames, CodeGenerator gen) {

@@ -1,4 +1,0 @@
-def main() {
-  INT x = 1 + 2;
-  return;
-}

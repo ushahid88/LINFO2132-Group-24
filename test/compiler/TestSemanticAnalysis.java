@@ -1,25 +1,17 @@
 package compiler;
 
-import compiler.Lexer.Lexer;
 import compiler.parser.AstNode;
-import compiler.parser.Parser;
 import compiler.semantic.SemanticAnalyzer;
 import compiler.semantic.SemanticException;
 import org.junit.Test;
 
-import java.io.StringReader;
-
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class TestSemanticAnalysis {
 
-    private AstNode parse(String input) {
-        Parser parser = new Parser(new Lexer(new StringReader(input)));
-        return parser.getAST();
-    }
-
     private void assertSemanticError(String input, String expectedKeyword) {
-        AstNode ast = parse(input);
+        AstNode ast = CompilerTestHelper.parse(input);
         try {
             SemanticAnalyzer.analyze(ast);
             fail("Expected semantic error containing " + expectedKeyword);
@@ -120,19 +112,19 @@ public class TestSemanticAnalysis {
 
     @Test
     public void validParameterShadowing() {
-        AstNode ast = parse("INT x = 5; def foo(INT x) { } def main() { foo(10); }");
-        SemanticAnalyzer.analyze(ast);
+        SemanticAnalyzer.analyze(CompilerTestHelper.parse(
+                "INT x = 5; def foo(INT x) { } def main() { foo(10); }"));
     }
 
     @Test
     public void validArrayTypeDeclaration() {
-        AstNode ast = parse("def main() { INT[] arr = INT ARRAY [1]; }");
-        SemanticAnalyzer.analyze(ast);
+        SemanticAnalyzer.analyze(CompilerTestHelper.parse(
+                "def main() { INT[] arr = INT ARRAY [1]; }"));
     }
 
     @Test
     public void validCollectionUsage() {
-        AstNode ast = parse("coll Point { INT x; INT y; } def main() { Point p = Point(1, 2); }");
-        SemanticAnalyzer.analyze(ast);
+        SemanticAnalyzer.analyze(CompilerTestHelper.parse(
+                "coll Point { INT x; INT y; } def main() { Point p = Point(1, 2); }"));
     }
 }

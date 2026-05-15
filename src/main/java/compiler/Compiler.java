@@ -32,9 +32,6 @@ public class Compiler {
             return;
         }
 
-        // Check for -o flag for code generation
-        // Format: source_file -o target_file
-        // Or: source_file (no -o flag, use defaults)
         if (args.length >= 1 && !args[0].startsWith("-")) {
             String sourceFile = args[0];
             String targetPath = null;
@@ -50,7 +47,6 @@ public class Compiler {
             return;
         }
 
-        // Default to parser mode if a single file argument is provided
         if (args.length == 1) {
             runParser(args[0]);
             return;
@@ -103,7 +99,6 @@ public class Compiler {
     private static void runCodeGeneration(String sourceFile, String targetPath) {
         Path srcPath = Path.of(sourceFile).toAbsolutePath().normalize();
 
-        // Determine output directory and class name
         Path outDir;
         String mainClassName = DEFAULT_CLASS_NAME;
 
@@ -123,7 +118,6 @@ public class Compiler {
             outDir = Path.of(DEFAULT_OUTPUT_DIR);
         }
 
-        // Ensure output directory exists
         try {
             Files.createDirectories(outDir);
         } catch (IOException e) {
@@ -136,10 +130,8 @@ public class Compiler {
             Parser parser = new Parser(lexer);
             AstNode ast = parser.getAST();
 
-            // Run semantic analysis
             SemanticAnalyzer.analyze(ast);
 
-            // Generate code
             CodeGenerator gen = new CodeGenerator(mainClassName, outDir);
             gen.generate(ast);
             gen.writeClassFiles();

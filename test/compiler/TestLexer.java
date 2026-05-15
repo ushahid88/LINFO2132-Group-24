@@ -1,38 +1,14 @@
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+package compiler;
+
+import compiler.Lexer.Lexer;
+import compiler.Lexer.Symbol;
 import org.junit.Test;
 
 import java.io.StringReader;
-import compiler.Lexer.Lexer;
-import compiler.Lexer.Symbol;
+
 import static org.junit.Assert.assertEquals;
 
 public class TestLexer {
-    
-    private Lexer createLexer(String input) {
-        return new Lexer(new StringReader(input));
-    }
-    
-    private void assertNextToken(Lexer lexer, Symbol.Kind expectedType) {
-        Symbol token = lexer.getNextSymbol();
-        assertNotNull(token);
-        if (!expectedType.equals(token.getKind())) {
-            System.out.println("Expected " + expectedType + " but got " + token.getKind() + " lexeme " + token.getLexeme());
-        }
-        assertEquals(expectedType, token.getKind());
-    }
-    
-    private void assertEOF(Lexer lexer) {
-        assertNextToken(lexer, Symbol.Kind.EOF);
-    }
-
-    @Test
-    public void test() {
-        String input = "var x int = 2;";
-        StringReader reader = new StringReader(input);
-        Lexer lexer = new Lexer(reader);
-        assertNotNull(lexer.getNextSymbol());
-    }
 
     @Test
     public void lexesBasicProgramPieces() {
@@ -66,8 +42,7 @@ public class TestLexer {
 
     @Test(expected = Lexer.LexerException.class)
     public void throwsOnUnknownToken() {
-        Lexer lexer = new Lexer(new StringReader("@"));
-        lexer.getNextSymbol();
+        new Lexer(new StringReader("@")).getNextSymbol();
     }
 
     @Test
@@ -79,6 +54,7 @@ public class TestLexer {
         assertEquals(new Symbol(Symbol.Kind.ASSIGN), lexer.getNextSymbol());
         assertEquals(new Symbol(Symbol.Kind.INT_LITERAL, "3"), lexer.getNextSymbol());
         assertEquals(new Symbol(Symbol.Kind.SEMICOLON), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.EOF), lexer.getNextSymbol());
     }
 
     @Test
@@ -102,4 +78,23 @@ public class TestLexer {
         assertEquals(new Symbol(Symbol.Kind.RBRACE), lexer.getNextSymbol());
     }
 
+    @Test
+    public void lexesComparisonAndLogicalOperators() {
+        Lexer lexer = new Lexer(new StringReader("== =/= && ||"));
+        assertEquals(new Symbol(Symbol.Kind.EQ), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.NEQ), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.AND), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.OR), lexer.getNextSymbol());
+    }
+
+    @Test
+    public void lexesBooleanLiteralsAndKeywords() {
+        Lexer lexer = new Lexer(new StringReader("true false coll ARRAY return not"));
+        assertEquals(new Symbol(Symbol.Kind.BOOL_LITERAL, "true"), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.BOOL_LITERAL, "false"), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.KW_COLL), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.KW_ARRAY), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.KW_RETURN), lexer.getNextSymbol());
+        assertEquals(new Symbol(Symbol.Kind.KW_NOT), lexer.getNextSymbol());
+    }
 }
