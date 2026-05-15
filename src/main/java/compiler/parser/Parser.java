@@ -67,11 +67,14 @@ public class Parser {
     private AstNode parseCollDecl() {
         t.consume(KW_COLL);
 
-        if (t.kind() != COLLECTION_NAME) {
+        if (t.kind() != COLLECTION_NAME && t.kind() != IDENTIFIER
+                && t.kind() != TYPE_INT && t.kind() != TYPE_FLOAT
+                && t.kind() != TYPE_BOOL && t.kind() != TYPE_STRING) {
             throw err("Expected collection name after 'coll', got " + t.peek());
         }
-        String name = t.peek().getLexeme();
-        t.consume(COLLECTION_NAME);
+
+        String name = getSymbolName(t.peek());
+        t.consume(t.kind());
 
         t.consume(LBRACE);
         Node fields = new Node("Fields");
@@ -81,6 +84,20 @@ public class Parser {
         t.consume(RBRACE);
 
         return new Node("CollDecl", Node.leaf("CollectionName, " + name), fields);
+    }
+
+    private static String getSymbolName(Symbol symbol) {
+        if (symbol.getLexeme() != null) {
+            return symbol.getLexeme();
+        }
+        switch (symbol.getKind()) {
+            case TYPE_INT: return "INT";
+            case TYPE_FLOAT: return "FLOAT";
+            case TYPE_BOOL: return "BOOL";
+            case TYPE_STRING: return "STRING";
+            default:
+                throw new IllegalArgumentException("Cannot extract name from symbol: " + symbol);
+        }
     }
 
     private AstNode parseFieldDecl() {
